@@ -2,6 +2,7 @@ var dgram = require('dgram');
 
 //ptp settings
 var ptp_domain = 0;
+var ptp_multicast = 0;
 var ptpMaster = '';
 var sync = false;
 var addr = '127.0.0.1';
@@ -23,15 +24,15 @@ var lastSync = 0;
 //functions
 //creates ptp delay_req buffer
 var ptp_delay_req = function(){
-	var length = 52;
+	var length = 44;
 	var buffer = Buffer.alloc(length);
 	req_seq = (req_seq + 1) % 0x10000;
 	
 	buffer.writeUInt8(1, 0);
 	buffer.writeUInt8(2, 1);
 	buffer.writeUInt16BE(length, 2);
+	buffer.writeUInt8(ptp_domain, 4);
 	buffer.writeUInt16BE(req_seq, 30);
-	
 	return buffer;
 }
 
@@ -64,6 +65,9 @@ exports.ptp_master = function(){
 exports.init = function(interface, domain, callback){
 	addr = interface ? interface : '127.0.0.1';
 	ptp_domain = domain ? domain : 0;
+    if(ptp_domain < 3) {
+        ptp_multicast = ptp_domain;
+    }
 	cb = callback ? callback : function(){};
 
 	ptpClientEvent.bind(319);
@@ -72,7 +76,7 @@ exports.init = function(interface, domain, callback){
 
 //event msg client
 ptpClientEvent.on('listening', function() {
-	ptpClientEvent.addMembership(ptpMulticastAddrs[ptp_domain], addr);
+	ptpClientEvent.addMembership(ptpMulticastAddrs[ptp_multicast], addr);
 });
 
 ptpClientEvent.on('message', function(buffer, remote) {
@@ -121,7 +125,7 @@ ptpClientEvent.on('message', function(buffer, remote) {
 		t1 = [tsS, tsNS];
 
 		//send delay_req
-		ptpClientEvent.send(ptp_delay_req(), 319, ptpMulticastAddrs[ptp_domain], function(){
+		ptpClientEvent.send(ptp_delay_req(), 319, ptpMulticastAddrs[ptp_multicast], function(){
 			t2 = getCorrectedTime();
 		});
 
@@ -131,7 +135,7 @@ ptpClientEvent.on('message', function(buffer, remote) {
 
 //general msg Client
 ptpClientGeneral.on('listening', function() {
-	ptpClientGeneral.addMembership(ptpMulticastAddrs[ptp_domain], addr);
+	ptpClientGeneral.addMembership(ptpMulticastAddrs[ptp_multicast], addr);
 });
 
 ptpClientGeneral.on('message', function(buffer, remote) {
@@ -162,7 +166,7 @@ ptpClientGeneral.on('message', function(buffer, remote) {
 		t1 = [tsS, tsNS];
 
 		//send delay_req
-		ptpClientEvent.send(ptp_delay_req(), 319, ptpMulticastAddrs[ptp_domain], function(){
+		ptpClientEvent.send(ptp_delay_req(), 319, ptpMulticastAddrs[ptp_multicast], function(){
 			t2 = getCorrectedTime();
 		});
 
